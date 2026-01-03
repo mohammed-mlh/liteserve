@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { rowsToObjects, saveDatabase } from './db-utils';
 import { DatabaseError, ValidationError, AuthenticationError } from './utils/errors';
 import { errorHandler } from './utils/error-handler';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
@@ -14,6 +15,8 @@ const PORT = process.env.PORT || 3005;
 
 const DB_FILE = process.env.DB_FILE!;
 const API_TOKEN = process.env.API_TOKEN!;
+const ENABLE_LOGGING = process.env.ENABLE_LOGGING === 'true';
+
 
 // Initialize SQL.js and load database
 let db: Database;
@@ -81,18 +84,33 @@ app.post("/query", (req, res, next) => {
     // Determine query type (read or write)
     const firstWord = sql.trim().split(/\s+/)[0].toLowerCase();
     const isReadQuery = firstWord === "select" || firstWord === "show" || firstWord === "pragma";
+    const startTime = performance.now();
+    let rowsAffected = 0;
+    let lastInsertRowid = 0;
 
     try {
       if (isReadQuery) {
         const result = db.exec(sql);
         const rows = rowsToObjects(result);
+        rowsAffected = rows.length;
         res.json(rows);
       } else {
         db.run(sql);
-        // Save database to file after write operations
         saveDatabase(db, DB_FILE);
+        rowsAffected = (db.exec("SELECT changes()")[0].values[0] as unknown as number) || 0;
         res.json({ success: true });
       }
+
+      if (ENABLE_LOGGING) {
+        logger({
+          query: sql,
+          type: isReadQuery ? 'read' : 'write',
+          success: true,
+          executionTime: performance.now() - startTime,
+          rowsAffected: rowsAffected,
+        });
+      }
+
     } catch (dbError: any) {
       // Wrap database errors with context
       throw new DatabaseError(
@@ -113,6 +131,9 @@ async function startServer() {
     await initializeDatabase();
     app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
+      if (ENABLE_LOGGING) {
+        console.log('Logging is enabled');
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);

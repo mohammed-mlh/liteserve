@@ -9,6 +9,7 @@ A lightweight, TypeScript-based HTTP server that exposes SQLite databases via a 
 - 📦 **Pure JavaScript** - Uses `sql.js` (no native dependencies)
 - 🔄 **Auto-Persistence** - Automatically saves changes to disk
 - ⚡ **Fast** - In-memory database with file-based persistence
+- 📊 **Query Logging** - Automatic logging of all queries with execution metrics
 
 ## Prerequisites
 
@@ -33,6 +34,9 @@ pnpm install
 PORT=3005
 DB_FILE=./db.sqlite
 API_TOKEN=your-secret-token-here
+
+# Optional: Enable query logging (default: true)
+ENABLE_LOGGING=true
 ```
 
 ## Usage
@@ -165,12 +169,74 @@ liteserve/
 │   ├── sqljs.d.ts          # TypeScript definitions for sql.js
 │   └── utils/
 │       ├── errors.ts       # Custom error classes
-│       └── error-handler.ts # Error handling middleware
+│       ├── error-handler.ts # Error handling middleware
+│       └── logger.ts        # Query logging utility
 ├── db.sqlite               # SQLite database file
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
+
+## Query Logging
+
+LiteServe automatically logs all database queries to help you monitor and debug your application.
+
+### Features
+
+- **Automatic Logging** - All queries are logged with detailed information
+- **Execution Metrics** - Track execution time, rows affected, and last insert row ID
+- **Error Tracking** - Failed queries are logged with error messages
+- **Configurable** - Enable or disable logging via environment variable
+
+### Configuration
+
+Set `ENABLE_LOGGING=true` (default) or `ENABLE_LOGGING=false` in your `.env` file to control logging.
+
+### Logged Information
+
+Each query log includes:
+- **Timestamp** - ISO format timestamp
+- **Query Type** - READ or WRITE
+- **Status** - SUCCESS or FAIL
+- **SQL Query** - The executed query
+- **Execution Time** - Query execution time in milliseconds
+- **Rows Affected** - Number of rows affected (for write queries) or returned (for read queries)
+- **Last Insert Row ID** - For INSERT queries
+- **Error Message** - If the query failed
+
+### Example Log Output
+
+**Successful Read Query:**
+```
+[2024-01-15T10:30:00.000Z] [READ][SUCCESS]
+  Query: SELECT * FROM users WHERE id = 1
+  Execution Time: 2.5ms
+  Rows Affected: 1
+```
+
+**Successful Write Query:**
+```
+[2024-01-15T10:30:01.000Z] [WRITE][SUCCESS]
+  Query: INSERT INTO users (name, email) VALUES ('John', 'john@example.com')
+  Execution Time: 3.2ms
+  Rows Affected: 1
+  Last Insert RowID: 5
+```
+
+**Failed Query:**
+```
+[2024-01-15T10:30:02.000Z] [READ][FAIL]
+  Query: SELECT * FROM non_existent_table
+  Execution Time: 0.8ms
+  Error: no such table: non_existent_table
+```
+
+### Use Cases
+
+- **Development** - Debug queries and identify performance issues
+- **Monitoring** - Track slow queries and execution patterns
+- **Troubleshooting** - Identify failed queries and errors
+- **Performance Analysis** - Monitor execution times and optimize queries
 
 ## Error Handling
 
